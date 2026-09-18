@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 0 — Building a lab that is safe to attack</title>
+<meta name="description" content="Hardening an AWS environment before writing a single detection: identity separation, no long-lived access keys, offline secrets and cost guardrails.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #F3F5F8;
+  --surface: #FFFFFF;
+  --ink: #131820;
+  --ink-soft: #505A6B;
+  --ink-faint: #7A8598;
+  --rule: #D9DEE6;
+  --rule-strong: #B9C1CD;
+  --secrets: #1B5FC1;
+  --root: #A8102C;
+  --user: #14713F;
+  --temp: #8A5A00;
+  --sans: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --measure: 68ch;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #11141B;
+    --surface: #171C25;
+    --ink: #E8EBF1;
+    --ink-soft: #A3ACBC;
+    --ink-faint: #788294;
+    --rule: #262D39;
+    --rule-strong: #38414F;
+    --secrets: #78ADFF;
+    --root: #FF8394;
+    --user: #5CD08D;
+    --temp: #E3A93F;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.62;
+  font-weight: 400;
+}
+
+h1, h2, h3 {
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  margin: 0;
+}
+
+p { margin: 0 0 1.1rem; max-width: var(--measure); }
+
+a { color: var(--secrets); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+code {
+  font-family: var(--mono);
+  font-size: 0.87em;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  padding: 0.12em 0.36em;
+  border-radius: 3px;
+}
+
+:focus-visible { outline: 2px solid var(--secrets); outline-offset: 3px; }
+
+/* ---------- hero ---------- */
+
+.hero {
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+}
+
+.hero-inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 4rem 1.5rem 3rem;
+}
+
+.hero h1 {
+  font-size: clamp(2rem, 5.2vw, 3.1rem);
+  max-width: 17ch;
+  margin-bottom: 1rem;
+}
+
+.hero .premise {
+  font-size: 1.12rem;
+  color: var(--ink-soft);
+  max-width: 62ch;
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1.8rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pill {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.01em;
+  padding: 0.3rem 0.65rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+}
+
+.pill-user { color: var(--user); }
+.pill-temp { color: var(--temp); }
+.pill-secrets { color: var(--secrets); }
+
+/* ---------- schematic ---------- */
+
+.schematic {
+  margin: 2.8rem 0 0;
+  padding: 1.5rem 0 0;
+  border-top: 1px solid var(--rule);
+}
+
+.schematic svg { display: block; width: 100%; height: auto; max-width: 620px; margin: 0 auto; }
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.1rem;
+  margin: 1.2rem auto 0;
+  padding: 0;
+  list-style: none;
+  max-width: 620px;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  color: var(--ink-soft);
+}
+
+.legend li { display: flex; align-items: center; gap: 0.4rem; }
+
+.swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+.caption {
+  max-width: 620px;
+  margin: 1.4rem auto 0;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+/* ---------- layout ---------- */
+
+.shell {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 1.5rem 5rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 3rem;
+}
+
+@media (min-width: 900px) {
+  .shell { grid-template-columns: 210px minmax(0, 1fr); gap: 4rem; }
+}
+
+.index { display: none; }
+
+@media (min-width: 900px) {
+  .index {
+    display: block;
+    position: sticky;
+    top: 0;
+    align-self: start;
+    padding-top: 3.5rem;
+    max-height: 100vh;
+    overflow-y: auto;
+  }
+  .index ol { list-style: none; margin: 0; padding: 0; }
+  .index li { margin: 0 0 0.1rem; }
+  .index a {
+    display: block;
+    padding: 0.3rem 0 0.3rem 0.85rem;
+    border-left: 2px solid var(--rule);
+    color: var(--ink-faint);
+    font-size: 0.86rem;
+    line-height: 1.35;
+    text-decoration: none;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .index a:hover { color: var(--ink); }
+  .index a[aria-current="true"] { color: var(--ink); border-left-color: var(--root); }
+}
+
+main { padding-top: 3.5rem; min-width: 0; }
+
+section { margin: 0 0 4rem; scroll-margin-top: 2rem; }
+
+section > h2 {
+  font-size: 1.55rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid var(--rule-strong);
+  margin-bottom: 1.6rem;
+}
+
+h3 { font-size: 1.08rem; margin: 2.2rem 0 0.7rem; }
+
+/* ---------- tables ---------- */
+
+.table-wrap { overflow-x: auto; margin: 0 0 1.4rem; }
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.95rem;
+}
+
+th, td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.7rem 1.1rem 0.7rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+th { font-weight: 600; color: var(--ink-soft); font-size: 0.82rem; }
+
+tbody th { color: var(--ink); font-size: 0.95rem; white-space: nowrap; }
+
+.facts { max-width: var(--measure); }
+.facts td:first-child { color: var(--ink-soft); white-space: nowrap; }
+
+/* ---------- callouts ---------- */
+
+.note {
+  border-left: 3px solid var(--rule-strong);
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  padding: 1rem 1.2rem;
+  margin: 0 0 1.5rem;
+  max-width: var(--measure);
+  border-radius: 0 4px 4px 0;
+}
+
+.note p:last-child { margin-bottom: 0; }
+
+.note b { display: block; margin-bottom: 0.25rem; font-weight: 600; }
+
+.note-key { border-left-color: var(--root); background: color-mix(in srgb, var(--root) 8%, transparent); }
+.note-key b { color: var(--root); }
+
+.note-watch { border-left-color: var(--temp); background: color-mix(in srgb, var(--temp) 10%, transparent); }
+.note-watch b { color: var(--temp); }
+
+.note-detail { border-left-color: var(--secrets); background: color-mix(in srgb, var(--secrets) 8%, transparent); }
+.note-detail b { color: var(--secrets); }
+
+/* ---------- decisions ---------- */
+
+.decision { margin: 0 0 2.2rem; max-width: var(--measure); }
+
+.decision h3 { margin-top: 0; }
+
+.decision dl { margin: 0; }
+
+.decision dt {
+  font-size: 0.78rem;
+  font-family: var(--mono);
+  color: var(--ink-faint);
+  margin: 0.75rem 0 0.1rem;
+}
+
+.decision dd { margin: 0; }
+
+/* ---------- lists ---------- */
+
+ol.steps { max-width: var(--measure); padding-left: 1.3rem; }
+ol.steps li { margin-bottom: 0.55rem; }
+
+ul.checks { list-style: none; margin: 0 0 1.4rem; padding: 0; max-width: var(--measure); }
+
+ul.checks li {
+  position: relative;
+  padding-left: 1.75rem;
+  margin-bottom: 0.5rem;
+}
+
+ul.checks li::before {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+}
+
+ul.checks li.done::before { content: "✓"; color: var(--user); }
+ul.checks li.todo::before { content: "○"; color: var(--temp); }
+
+/* ---------- code ---------- */
+
+pre {
+  font-family: var(--mono);
+  font-size: 0.84rem;
+  line-height: 1.7;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  padding: 1rem 1.1rem;
+  overflow-x: auto;
+  margin: 0 0 1.5rem;
+  max-width: var(--measure);
+}
+
+pre code { background: none; padding: 0; font-size: 1em; }
+
+pre .cmt { color: var(--ink-faint); }
+
+/* ---------- closing ---------- */
+
+.resume {
+  border: 1px solid var(--rule-strong);
+  border-radius: 5px;
+  padding: 1.3rem 1.4rem;
+  max-width: var(--measure);
+  background: var(--surface);
+}
+
+.resume p:last-child { margin-bottom: 0; }
+
+.resume span {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  margin-bottom: 0.5rem;
+}
+
+footer {
+  border-top: 1px solid var(--rule);
+  padding: 2rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+  max-width: var(--measure);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; scroll-behavior: auto !important; }
+}
+
+html { scroll-behavior: smooth; }
+
+@media print {
+  .index { display: none; }
+  body { background: #fff; color: #000; font-size: 11pt; }
+  .hero { border-bottom: 1px solid #999; }
+  .shell { display: block; padding: 0 1rem; }
+  pre, .resume, .note { break-inside: avoid; }
+  section { break-inside: auto; margin-bottom: 2rem; }
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <h1>Week 0 — Building a lab that is safe to attack</h1>
+    <p class="premise">This lab simulates LLMjacking: an attacker stealing cloud credentials to run expensive AI models at the victim's expense. Before writing a single detection, the environment itself had to be sound, because a lab with sloppy credential hygiene would undermine the whole premise.</p>
+
+    <ul class="pills">
+      <li class="pill pill-user">0 long-lived access keys</li>
+      <li class="pill pill-temp">$0 spent, AWS Free plan</li>
+      <li class="pill pill-secrets">3 cost alert thresholds</li>
+    </ul>
+
+    <div class="schematic">
+      <svg viewBox="0 0 620 610" role="img" aria-labelledby="schematic-title schematic-desc">
+        <title id="schematic-title">The credential model</title>
+        <desc id="schematic-desc">Local secrets unlock two separate identities: a root user reserved for billing and emergencies, and an IAM user for daily work. The IAM user exchanges a console sign-in for short-lived credentials, which are what the AWS CLI and Terraform use.</desc>
+
+        <defs>
+          <marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M1 1.5 L9 5 L1 8.5" fill="none" stroke="context-stroke" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+
+        <g font-family="IBM Plex Sans, system-ui, sans-serif">
+
+          <!-- local secrets -->
+          <rect x="150" y="12" width="320" height="76" rx="6" fill="none" stroke="var(--secrets)" stroke-width="1.5"/>
+          <text x="310" y="42" text-anchor="middle" font-size="17" font-weight="600" fill="var(--secrets)">Local secrets</text>
+          <text x="310" y="65" text-anchor="middle" font-size="13" fill="var(--ink-soft)">KeePassXC vault and authenticator app</text>
+
+          <!-- edges from secrets -->
+          <path d="M240 90 L150 168" fill="none" stroke="var(--rule-strong)" stroke-width="1.5" marker-end="url(#tip)"/>
+          <path d="M380 90 L470 168" fill="none" stroke="var(--rule-strong)" stroke-width="1.5" marker-end="url(#tip)"/>
+          <text x="140" y="128" text-anchor="end" font-size="11.5" font-family="IBM Plex Mono, monospace" fill="var(--ink-faint)">password + 2FA</text>
+          <text x="482" y="128" font-size="11.5" font-family="IBM Plex Mono, monospace" fill="var(--ink-faint)">password + 2FA</text>
+
+          <!-- root -->
+          <rect x="18" y="176" width="256" height="96" rx="6" fill="none" stroke="var(--root)" stroke-width="1.5"/>
+          <text x="146" y="208" text-anchor="middle" font-size="17" font-weight="600" fill="var(--root)">Root user</text>
+          <text x="146" y="230" text-anchor="middle" font-size="13" fill="var(--ink-soft)">MFA, no access keys</text>
+          <text x="146" y="252" text-anchor="middle" font-size="13" fill="var(--ink-soft)">billing and emergencies only</text>
+
+          <!-- iam user -->
+          <rect x="346" y="176" width="256" height="96" rx="6" fill="none" stroke="var(--user)" stroke-width="1.5"/>
+          <text x="474" y="214" text-anchor="middle" font-size="17" font-weight="600" fill="var(--user)">IAM user</text>
+          <text x="474" y="238" text-anchor="middle" font-size="13" fill="var(--ink-soft)">MFA, daily work</text>
+
+          <!-- root creates user -->
+          <path d="M280 224 L340 224" fill="none" stroke="var(--rule-strong)" stroke-width="1.5" marker-end="url(#tip)"/>
+          <text x="310" y="214" text-anchor="middle" font-size="11.5" font-family="IBM Plex Mono, monospace" fill="var(--ink-faint)">created</text>
+
+          <!-- user to temp -->
+          <path d="M474 274 L474 320 Q474 336 458 336 L400 336" fill="none" stroke="var(--rule-strong)" stroke-width="1.5" marker-end="url(#tip)"/>
+          <text x="488" y="308" font-size="11.5" font-family="IBM Plex Mono, monospace" fill="var(--ink-faint)">aws login</text>
+
+          <!-- temp credentials -->
+          <rect x="132" y="300" width="262" height="76" rx="6" fill="none" stroke="var(--temp)" stroke-width="1.5"/>
+          <text x="263" y="330" text-anchor="middle" font-size="17" font-weight="600" fill="var(--temp)">Short-lived credentials</text>
+          <text x="263" y="353" text-anchor="middle" font-size="13" fill="var(--ink-soft)">expire automatically</text>
+
+          <!-- temp to tools -->
+          <path d="M200 378 L150 436" fill="none" stroke="var(--rule-strong)" stroke-width="1.5" marker-end="url(#tip)"/>
+          <path d="M326 378 L376 436" fill="none" stroke="var(--rule-strong)" stroke-width="1.5" marker-end="url(#tip)"/>
+
+          <rect x="50" y="444" width="200" height="60" rx="6" fill="none" stroke="var(--temp)" stroke-width="1.5" stroke-dasharray="3 3"/>
+          <text x="150" y="480" text-anchor="middle" font-size="15" fill="var(--ink)">AWS CLI</text>
+
+          <rect x="276" y="444" width="200" height="60" rx="6" fill="none" stroke="var(--temp)" stroke-width="1.5" stroke-dasharray="3 3"/>
+          <text x="376" y="480" text-anchor="middle" font-size="15" fill="var(--ink)">Terraform</text>
+
+          <text x="310" y="556" text-anchor="middle" font-size="13" fill="var(--ink-faint)">Nothing permanent reaches the command line.</text>
+        </g>
+      </svg>
+
+      <ul class="legend">
+        <li><span class="swatch" style="background: var(--secrets)"></span>held offline</li>
+        <li><span class="swatch" style="background: var(--root)"></span>restricted identity</li>
+        <li><span class="swatch" style="background: var(--user)"></span>daily identity</li>
+        <li><span class="swatch" style="background: var(--temp)"></span>expires on its own</li>
+      </ul>
+
+      <p class="caption">Two factors, two identities, and credentials that die on their own. The same four colours are used throughout this page.</p>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+
+  <nav class="index" aria-label="Contents">
+    <ol>
+      <li><a href="#built">What was built</a></li>
+      <li><a href="#decisions">Security decisions</a></li>
+      <li><a href="#problems">Problems hit</a></li>
+      <li><a href="#buildlog">Build log</a></li>
+      <li><a href="#verification">Verification</a></li>
+      <li><a href="#open">Open items</a></li>
+      <li><a href="#demonstrates">What this demonstrates</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <section id="built">
+      <h2>What was built</h2>
+
+      <div class="note">
+        <b>How to read this</b>
+        <p>The first half is the summary and the reasoning, which is the interesting part. The build log, commands and verification steps come after, for anyone reproducing the setup.</p>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <tbody>
+            <tr><th scope="row">Identity</th><td>Dedicated root email with TOTP MFA and offline backup codes</td></tr>
+            <tr><th scope="row">AWS account</th><td>Free plan, root protected by MFA, zero access keys</td></tr>
+            <tr><th scope="row">Daily access</th><td>Separate IAM user with its own MFA; root parked for billing and emergencies</td></tr>
+            <tr><th scope="row">Credentials</th><td>Short-lived CLI credentials via <code>aws login</code></td></tr>
+            <tr><th scope="row">Secrets</th><td>Offline encrypted vault, backed up in three places</td></tr>
+            <tr><th scope="row">Cost control</th><td>Monthly budget with three alert thresholds, set before any workload</td></tr>
+            <tr><th scope="row">Toolchain</th><td>AWS CLI, Terraform, Python, Git, GitHub CLI</td></tr>
+            <tr><th scope="row">Repository</th><td>Public repo with project structure and a <code>.gitignore</code> that blocks state files and secrets</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="decisions">
+      <h2>Security decisions and rationale</h2>
+      <p>The decisions matter more than the clicks. Each one below was a choice with a trade-off.</p>
+
+      <div class="decision">
+        <h3>A dedicated email identity for the root user</h3>
+        <dl>
+          <dt>Decision</dt>
+          <dd>A separate mailbox for the AWS root user, with its own two-step verification, backup codes stored offline, and recovery phone and email configured.</dd>
+          <dt>Why</dt>
+          <dd>The root email is the account recovery path. Whoever controls it can request a password reset.</dd>
+          <dt>Trade-off</dt>
+          <dd>A mailbox that is rarely opened can go dormant. Mitigated with forwarding to a primary inbox and a periodic sign-in reminder.</dd>
+        </dl>
+      </div>
+
+      <div class="decision">
+        <h3>An offline password manager instead of a cloud one</h3>
+        <dl>
+          <dt>Decision</dt>
+          <dd>KeePassXC, a local encrypted file, over cloud-hosted managers.</dd>
+          <dt>Why</dt>
+          <dd>In February 2026, researchers at ETH Zurich and USI published attacks against several major password managers under a malicious-server threat model. A local file removes that attack surface entirely.</dd>
+          <dt>Trade-off</dt>
+          <dd>Backups become my responsibility, handled with three copies: local, cloud (the file is encrypted, so this is acceptable), and the master passphrase on paper.</dd>
+        </dl>
+      </div>
+
+      <div class="decision">
+        <h3>The second factor lives outside the vault</h3>
+        <dl>
+          <dt>Decision</dt>
+          <dd>TOTP codes stay in an authenticator app, not in the password manager, even though the manager supports them.</dd>
+          <dt>Why</dt>
+          <dd>Storing both factors in one place collapses two-factor authentication back into one. Backup codes live in the vault, so losing the phone is still recoverable.</dd>
+        </dl>
+      </div>
+
+      <div class="decision">
+        <h3>Root parked, IAM user for daily work</h3>
+        <dl>
+          <dt>Decision</dt>
+          <dd>An IAM user with its own MFA handles everything; root is reserved for billing and emergencies.</dd>
+          <dt>Why</dt>
+          <dd>Root can do irreversible things: close the account, change its email, remove MFA. The worst outcome of a mistake as the IAM user is deleting resources Terraform can recreate.</dd>
+        </dl>
+      </div>
+
+      <div class="decision">
+        <h3>No long-lived access keys, anywhere</h3>
+
+        <div class="note note-key">
+          <b>The decision this project turns on</b>
+          <p>LLMjacking campaigns overwhelmingly begin with a leaked long-lived access key. Creating one for a lab about detecting exactly that would be self-defeating.</p>
+        </div>
+
+        <p>The CLI uses <code>aws login</code> (AWS CLI 2.32.0 or later), which exchanges a console sign-in for short-lived credentials. Verified with <code>aws sts get-caller-identity</code>.</p>
+
+        <div class="note note-detail">
+          <b>A detail that comes back later</b>
+          <p>The returned <code>UserId</code> begins with <code>AIDA</code>, the prefix for an IAM user. <code>AKIA</code> identifies long-lived access keys and <code>ASIA</code> identifies temporary credentials. Detections filtering on <code>AKIA</code> alone are blind to attackers operating with temporary credentials, a known gap this lab will document rather than hide.</p>
+        </div>
+      </div>
+
+      <div class="decision">
+        <h3>Free plan, and deliberately no AWS Organizations</h3>
+        <dl>
+          <dt>Decision</dt>
+          <dd>Stay on the AWS Free plan and avoid enabling AWS Organizations.</dd>
+          <dt>Why</dt>
+          <dd>The Free plan cannot incur charges: consumption is drawn from credits, and when the plan ends the account closes rather than converting to pay-as-you-go.</dd>
+        </dl>
+
+        <div class="note note-watch">
+          <b>Watch out</b>
+          <p>Joining or creating an AWS Organization automatically upgrades the account to the paid plan and expires the credits immediately.</p>
+        </div>
+
+        <p>Service Control Policies are therefore unavailable in this lab, so the preventive controls in the response phase use IAM quarantine policies instead. That is a realistic constraint anyway, since most small teams operate a single account.</p>
+      </div>
+
+      <div class="decision">
+        <h3>Cost guardrails before the first workload</h3>
+        <dl>
+          <dt>Decision</dt>
+          <dd>A $50 monthly cost budget with three alerts on actual cost at 10%, 40% and 100%, which is $5, $20 and $50, delivered by email and configured before any resource existed.</dd>
+          <dt>Why</dt>
+          <dd>A lab that invokes AI models is exactly the kind of workload where a mistake compounds quietly.</dd>
+        </dl>
+      </div>
+
+      <div class="decision">
+        <h3>Repository hygiene from the first commit</h3>
+<pre><code>*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+.env
+*.kdbx
+.DS_Store</code></pre>
+        <p>Terraform state contains resource identifiers and can contain secrets in plaintext. Committing it to a public repository is a common and costly mistake.</p>
+      </div>
+    </section>
+
+    <section id="problems">
+      <h2>Problems hit and how they were solved</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th scope="col">Symptom</th><th scope="col">Cause</th><th scope="col">Fix</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Budget charge-type filter offered no values</td>
+              <td>Cost Explorer has not ingested data on a new account</td>
+              <td>Created the budget without the filter and scheduled it for 48 hours later</td>
+            </tr>
+            <tr>
+              <td><code>git clone</code> rejected: password authentication is not supported</td>
+              <td>GitHub removed password authentication for Git operations</td>
+              <td>Personal access token with <code>repo</code> scope, then replaced by <code>gh auth login</code> as credential helper</td>
+            </tr>
+            <tr>
+              <td><code>Repository not found</code></td>
+              <td>Cloning a name that did not exist on the account</td>
+              <td>Copied the exact URL from GitHub</td>
+            </tr>
+            <tr>
+              <td><code>HTTP 422: name already exists</code></td>
+              <td>The repository had been created in an earlier attempt</td>
+              <td>Used <code>gh repo edit</code> to set the description instead</td>
+            </tr>
+            <tr>
+              <td>MFA device name rejected</td>
+              <td>The field accepts only <code>A-Z a-z 0-9 + = , . @ _ -</code></td>
+              <td>Removed the accented character</td>
+            </tr>
+            <tr>
+              <td>Two-step verification active but SMS-only</td>
+              <td>Default method offered during sign-up</td>
+              <td>Added TOTP and backup codes, then demoted SMS, since SIM swapping makes it the weakest factor</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="buildlog">
+      <h2>Build log</h2>
+
+      <h3>Account</h3>
+      <ol class="steps">
+        <li>Created the AWS account with the dedicated email, account type Personal, support plan Basic, account plan Free.</li>
+        <li>Assigned an MFA device to the root user. AWS requires root MFA to be registered within 35 days of first sign-in, so doing it immediately avoids hitting that deadline.</li>
+        <li>Confirmed the root user has no access keys.</li>
+        <li>Set the working region to <code>us-east-1</code>. The console defaulted elsewhere; <code>us-east-1</code> was chosen because Amazon Bedrock offers the widest model availability there and most tooling assumes it.</li>
+      </ol>
+
+      <h3>Cost controls</h3>
+      <ol class="steps" start="5">
+        <li>Billing and Cost Management, then Budgets, Create budget, Customize (advanced), Cost budget.</li>
+        <li>Monthly recurring budget of $50, scoped to all AWS services.</li>
+        <li>Three alert thresholds on actual cost at 10%, 40% and 100%, all notifying by email.</li>
+      </ol>
+
+      <div class="note note-watch">
+        <b>Known limitation</b>
+        <p>The budget should also filter charge type to exclude credits, so alerts reflect real consumption rather than the net after credits. On a brand-new account that filter is empty, because Cost Explorer has not ingested data yet. Tracked in open items.</p>
+      </div>
+
+      <h3>Daily-use identity</h3>
+      <ol class="steps" start="8">
+        <li>IAM, Users, Create user, with console access and a generated password.</li>
+        <li>Attached <code>AdministratorAccess</code>, appropriate for a personal lab. Least privilege is applied where it matters here: the roles and policies the lab itself creates.</li>
+        <li>Signed in through the account sign-in URL and assigned a second MFA device to this user.</li>
+        <li>Renamed both authenticator entries to distinguish root from the IAM user.</li>
+      </ol>
+
+      <h3>Toolchain</h3>
+      <div class="table-wrap">
+        <table class="facts">
+          <thead><tr><th scope="col">Tool</th><th scope="col">Version</th></tr></thead>
+          <tbody>
+            <tr><td>AWS CLI</td><td>2.36.48</td></tr>
+            <tr><td>Terraform</td><td>1.16.3</td></tr>
+            <tr><td>Python</td><td>3.14.7</td></tr>
+            <tr><td>Git</td><td>2.54.0</td></tr>
+            <tr><td>GitHub CLI</td><td>2.101.0</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+<pre><code>aws login                      <span class="cmt"># browser sign-in, short-lived credentials</span>
+aws sts get-caller-identity    <span class="cmt"># confirms the active identity</span></code></pre>
+
+      <h3>Repository</h3>
+<pre><code>gh auth login                  <span class="cmt"># also configures Git credentials</span>
+gh repo create aws-llmjacking-detection-lab --public --clone --add-readme
+mkdir terraform attacks detections response docs</code></pre>
+
+      <div class="table-wrap">
+        <table>
+          <tbody>
+            <tr><th scope="row"><code>terraform/</code></th><td>Infrastructure as code</td></tr>
+            <tr><th scope="row"><code>attacks/</code></th><td>Attack simulation and captured events</td></tr>
+            <tr><th scope="row"><code>detections/</code></th><td>Sigma rules, fixtures, CI validation</td></tr>
+            <tr><th scope="row"><code>response/</code></th><td>Automated response</td></tr>
+            <tr><th scope="row"><code>docs/</code></th><td>Threat model, coverage, findings</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="verification">
+      <h2>Verification</h2>
+
+<pre><code>aws sts get-caller-identity    <span class="cmt"># ARN ends in :user/&lt;iam-user&gt;, not :root</span>
+git status                     <span class="cmt"># clean working tree</span>
+git log --oneline              <span class="cmt"># commit history</span>
+cat .gitignore                 <span class="cmt"># state files and secrets excluded</span></code></pre>
+
+      <ul class="checks">
+        <li class="done">IAM user shows an assigned MFA device</li>
+        <li class="done">Root shows MFA assigned and no access keys</li>
+        <li class="done">Budgets shows the budget with three alerts</li>
+        <li class="done">Region is <code>us-east-1</code></li>
+      </ul>
+    </section>
+
+    <section id="open">
+      <h2>Open items</h2>
+      <ul class="checks">
+        <li class="todo">Add the charge-type filter to the budget to exclude credits, once Cost Explorer has data</li>
+        <li class="todo">Register a second MFA device for the root user, a hardware key, as a recovery path</li>
+        <li class="todo">Copy the vault to external media, in addition to the existing cloud copy</li>
+        <li class="todo">Record the Free plan expiry date, since the account closes automatically if not upgraded</li>
+      </ul>
+    </section>
+
+    <section id="demonstrates">
+      <h2>What this demonstrates</h2>
+      <p>Nothing here is exotic, and that is the point. It is the baseline a cloud security engineer is expected to establish before any workload exists.</p>
+
+      <div class="table-wrap">
+        <table>
+          <tbody>
+            <tr><th scope="row">Identity and access management</th><td>Root and daily-user separation, MFA on every human identity, no long-lived credentials</td></tr>
+            <tr><th scope="row">Secrets management</th><td>Offline encrypted vault, factors kept separate, documented recovery path</td></tr>
+            <tr><th scope="row">Cost governance</th><td>Budget alerts configured before the first resource</td></tr>
+            <tr><th scope="row">Infrastructure as code readiness</th><td>Provider pinning, tagging strategy, state files excluded from version control</td></tr>
+            <tr><th scope="row">Documentation</th><td>Decisions recorded with rationale and trade-offs, including accepted constraints and open gaps</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="resume">
+        <span>Résumé line</span>
+        <p>Built a hardened AWS lab environment for a purple team detection project: MFA-protected identity separation, zero long-lived access keys with short-lived CLI credentials, an offline secrets vault and cost guardrails, documented as a reproducible runbook.</p>
+      </div>
+    </section>
+
+    <footer>
+      <p>Next: Week 1 builds CloudTrail, S3 log storage and Bedrock invocation logging, all in Terraform.</p>
+    </footer>
+
+  </main>
+</div>
+
+<script>
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('.index a'));
+  var map = {};
+  links.forEach(function (link) {
+    var target = document.querySelector(link.getAttribute('href'));
+    if (target) { map[target.id] = link; }
+  });
+
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) {
+        links.forEach(function (l) { l.removeAttribute('aria-current'); });
+        if (map[entry.target.id]) { map[entry.target.id].setAttribute('aria-current', 'true'); }
+      }
+    });
+  }, { rootMargin: '-10% 0px -75% 0px' });
+
+  Object.keys(map).forEach(function (id) {
+    observer.observe(document.getElementById(id));
+  });
+})();
+</script>
+
+</body>
+</html>
