@@ -13,3 +13,7 @@ A purple team lab that simulates LLMjacking attacks against Amazon Bedrock and b
 ## Status
 
 Work in progress.
+
+## Write-ups
+
+- [Week 0 — Building a lab that is safe to attack](https://yamekuro.github.io/aws-llmjacking-detection-lab/week-0-setup.html)
