@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AWS LLMjacking Detection Lab</title>
+<meta name="description" content="A purple team lab that simulates LLMjacking attacks against Amazon Bedrock and builds the detections to catch them.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #F3F5F8;
+  --surface: #FFFFFF;
+  --ink: #131820;
+  --ink-soft: #505A6B;
+  --ink-faint: #7A8598;
+  --rule: #D9DEE6;
+  --rule-strong: #B9C1CD;
+  --secrets: #1B5FC1;
+  --root: #A8102C;
+  --user: #14713F;
+  --temp: #8A5A00;
+  --sans: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #11141B;
+    --surface: #171C25;
+    --ink: #E8EBF1;
+    --ink-soft: #A3ACBC;
+    --ink-faint: #788294;
+    --rule: #262D39;
+    --rule-strong: #38414F;
+    --secrets: #78ADFF;
+    --root: #FF8394;
+    --user: #5CD08D;
+    --temp: #E3A93F;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.62;
+}
+
+h1, h2 { font-weight: 600; letter-spacing: -0.015em; line-height: 1.2; margin: 0; }
+
+p { margin: 0 0 1.1rem; }
+
+a { color: var(--secrets); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+code {
+  font-family: var(--mono);
+  font-size: 0.87em;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  padding: 0.12em 0.36em;
+  border-radius: 3px;
+}
+
+:focus-visible { outline: 2px solid var(--secrets); outline-offset: 3px; }
+
+.wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 4.5rem 1.5rem 5rem;
+}
+
+h1 {
+  font-size: clamp(1.9rem, 5.5vw, 2.6rem);
+  margin-bottom: 1rem;
+}
+
+.premise {
+  font-size: 1.12rem;
+  color: var(--ink-soft);
+  margin-bottom: 1.6rem;
+}
+
+.pills { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0 0 3.5rem; padding: 0; list-style: none; }
+
+.pill {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  padding: 0.3rem 0.65rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+}
+
+.pill-user { color: var(--user); }
+.pill-temp { color: var(--temp); }
+.pill-secrets { color: var(--secrets); }
+
+h2 {
+  font-size: 1.05rem;
+  color: var(--ink-soft);
+  font-weight: 600;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--rule-strong);
+  margin-bottom: 0.4rem;
+}
+
+.weeks { list-style: none; margin: 0 0 3.5rem; padding: 0; }
+
+.weeks li {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  gap: 1rem;
+  align-items: baseline;
+  padding: 0.95rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+@media (max-width: 520px) {
+  .weeks li { grid-template-columns: 1fr; gap: 0.15rem; }
+}
+
+.when {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+}
+
+.what { min-width: 0; }
+
+.what a { font-weight: 500; }
+
+.what .sub {
+  display: block;
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+  margin-top: 0.1rem;
+}
+
+.weeks li.done .when { color: var(--user); }
+
+.weeks li.next .when { color: var(--temp); }
+
+.weeks li.later .what,
+.weeks li.later .what .sub { color: var(--ink-faint); }
+
+.foot {
+  border-top: 1px solid var(--rule);
+  padding-top: 1.6rem;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+.foot p:last-child { margin-bottom: 0; }
+</style>
+</head>
+<body>
+
+<main class="wrap">
+
+  <h1>AWS LLMjacking Detection Lab</h1>
+
+  <p class="premise">A purple team lab that simulates LLMjacking — attackers using stolen cloud credentials to run expensive AI models on someone else's bill — and builds the detections to catch it.</p>
+
+  <ul class="pills">
+    <li class="pill pill-user">Terraform</li>
+    <li class="pill pill-temp">Sigma</li>
+    <li class="pill pill-secrets">Amazon Bedrock</li>
+    <li class="pill pill-user">MITRE ATT&amp;CK</li>
+  </ul>
+
+  <h2>Write-ups</h2>
+
+  <ol class="weeks">
+    <li class="done">
+      <span class="when">Week 0</span>
+      <span class="what">
+        <a href="week-0-setup.html">Building a lab that is safe to attack</a>
+        <span class="sub">Identity separation, no long-lived access keys, offline secrets, cost guardrails</span>
+      </span>
+    </li>
+    <li class="next">
+      <span class="when">Week 1</span>
+      <span class="what">
+        Giving the lab eyes
+        <span class="sub">CloudTrail, S3 log storage and Bedrock invocation logging, all in Terraform</span>
+      </span>
+    </li>
+    <li class="later">
+      <span class="when">Weeks 2–3</span>
+      <span class="what">
+        Simulating the attack
+        <span class="sub">Stratus Red Team against my own account, mapped to MITRE ATT&amp;CK</span>
+      </span>
+    </li>
+    <li class="later">
+      <span class="when">Weeks 3–5</span>
+      <span class="what">
+        Detection as code
+        <span class="sub">Sigma rules with test fixtures, validated in CI</span>
+      </span>
+    </li>
+    <li class="later">
+      <span class="when">Week 6</span>
+      <span class="what">
+        Automated response
+        <span class="sub">Quarantining a compromised credential, with cost anomaly detection as a backstop</span>
+      </span>
+    </li>
+    <li class="later">
+      <span class="when">Weeks 7–8</span>
+      <span class="what">
+        Publishing the work
+        <span class="sub">Documentation, an article, and a rule proposed upstream to SigmaHQ</span>
+      </span>
+    </li>
+  </ol>
+
+  <div class="foot">
+    <p>Source, Terraform and detection rules: <a href="https://github.com/yamekuro/aws-llmjacking-detection-lab">github.com/yamekuro/aws-llmjacking-detection-lab</a></p>
+    <p>Everything here runs against a dedicated lab account. No third-party systems are touched.</p>
+  </div>
+
+</main>
+
+</body>
+</html>
