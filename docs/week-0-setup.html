@@ -63,7 +63,7 @@ h1, h2, h3 {
   margin: 0;
 }
 
-p { margin: 0 0 1.1rem; max-width: var(--measure); }
+p { margin: 0 0 1.1rem; }
 
 a { color: var(--secrets); text-decoration-thickness: 1px; text-underline-offset: 2px; }
 
@@ -85,14 +85,23 @@ code {
 }
 
 .hero-inner {
-  max-width: 1120px;
+  max-width: 1040px;
   margin: 0 auto;
   padding: 4rem 1.5rem 3rem;
 }
 
+@media (min-width: 1040px) {
+  .hero-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 450px;
+    gap: 3.5rem;
+    align-items: start;
+  }
+}
+
 .hero h1 {
-  font-size: clamp(2rem, 5.2vw, 3.1rem);
-  max-width: 17ch;
+  font-size: clamp(2rem, 4.4vw, 2.85rem);
+  max-width: 20ch;
   margin-bottom: 1rem;
 }
 
@@ -132,6 +141,15 @@ code {
   border-top: 1px solid var(--rule);
 }
 
+@media (min-width: 1040px) {
+  .schematic {
+    margin: 0;
+    padding: 0.4rem 0 0 2.5rem;
+    border-top: 0;
+    border-left: 1px solid var(--rule);
+  }
+}
+
 .schematic svg { display: block; width: 100%; height: auto; max-width: 620px; margin: 0 auto; }
 
 .legend {
@@ -161,7 +179,7 @@ code {
 /* ---------- layout ---------- */
 
 .shell {
-  max-width: 1120px;
+  max-width: 1040px;
   margin: 0 auto;
   padding: 0 1.5rem 5rem;
   display: grid;
@@ -170,7 +188,7 @@ code {
 }
 
 @media (min-width: 900px) {
-  .shell { grid-template-columns: 210px minmax(0, 1fr); gap: 4rem; }
+  .shell { grid-template-columns: 196px minmax(0, 1fr); gap: 3.5rem; }
 }
 
 .index { display: none; }
@@ -201,7 +219,7 @@ code {
   .index a[aria-current="true"] { color: var(--ink); border-left-color: var(--root); }
 }
 
-main { padding-top: 3.5rem; min-width: 0; }
+main { padding-top: 3.5rem; min-width: 0; max-width: 78ch; }
 
 section { margin: 0 0 4rem; scroll-margin-top: 2rem; }
 
@@ -217,6 +235,10 @@ h3 { font-size: 1.08rem; margin: 2.2rem 0 0.7rem; }
 /* ---------- tables ---------- */
 
 .table-wrap { overflow-x: auto; margin: 0 0 1.4rem; }
+
+.table-wrap.wide table { min-width: 30rem; }
+
+.table-wrap.wide:focus-visible { outline: 2px solid var(--secrets); outline-offset: 2px; }
 
 table {
   border-collapse: collapse;
@@ -235,7 +257,6 @@ th { font-weight: 600; color: var(--ink-soft); font-size: 0.82rem; }
 
 tbody th { color: var(--ink); font-size: 0.95rem; white-space: nowrap; }
 
-.facts { max-width: var(--measure); }
 .facts td:first-child { color: var(--ink-soft); white-space: nowrap; }
 
 /* ---------- callouts ---------- */
@@ -245,7 +266,6 @@ tbody th { color: var(--ink); font-size: 0.95rem; white-space: nowrap; }
   background: color-mix(in srgb, var(--ink) 4%, transparent);
   padding: 1rem 1.2rem;
   margin: 0 0 1.5rem;
-  max-width: var(--measure);
   border-radius: 0 4px 4px 0;
 }
 
@@ -264,7 +284,7 @@ tbody th { color: var(--ink); font-size: 0.95rem; white-space: nowrap; }
 
 /* ---------- decisions ---------- */
 
-.decision { margin: 0 0 2.2rem; max-width: var(--measure); }
+.decision { margin: 0 0 2.2rem; }
 
 .decision h3 { margin-top: 0; }
 
@@ -281,10 +301,10 @@ tbody th { color: var(--ink); font-size: 0.95rem; white-space: nowrap; }
 
 /* ---------- lists ---------- */
 
-ol.steps { max-width: var(--measure); padding-left: 1.3rem; }
+ol.steps { padding-left: 1.3rem; }
 ol.steps li { margin-bottom: 0.55rem; }
 
-ul.checks { list-style: none; margin: 0 0 1.4rem; padding: 0; max-width: var(--measure); }
+ul.checks { list-style: none; margin: 0 0 1.4rem; padding: 0; }
 
 ul.checks li {
   position: relative;
@@ -315,7 +335,6 @@ pre {
   padding: 1rem 1.1rem;
   overflow-x: auto;
   margin: 0 0 1.5rem;
-  max-width: var(--measure);
 }
 
 pre code { background: none; padding: 0; font-size: 1em; }
@@ -328,7 +347,6 @@ pre .cmt { color: var(--ink-faint); }
   border: 1px solid var(--rule-strong);
   border-radius: 5px;
   padding: 1.3rem 1.4rem;
-  max-width: var(--measure);
   background: var(--surface);
 }
 
@@ -347,7 +365,6 @@ footer {
   padding: 2rem 0 0;
   color: var(--ink-soft);
   font-size: 0.95rem;
-  max-width: var(--measure);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -370,6 +387,7 @@ html { scroll-behavior: smooth; }
 
 <header class="hero">
   <div class="hero-inner">
+    <div class="hero-copy">
     <h1>Week 0 — Building a lab that is safe to attack</h1>
     <p class="premise">This lab simulates LLMjacking: an attacker stealing cloud credentials to run expensive AI models at the victim's expense. Before writing a single detection, the environment itself had to be sound, because a lab with sloppy credential hygiene would undermine the whole premise.</p>
 
@@ -378,9 +396,10 @@ html { scroll-behavior: smooth; }
       <li class="pill pill-temp">$0 spent, AWS Free plan</li>
       <li class="pill pill-secrets">3 cost alert thresholds</li>
     </ul>
+    </div>
 
     <div class="schematic">
-      <svg viewBox="0 0 620 610" role="img" aria-labelledby="schematic-title schematic-desc">
+      <svg viewBox="0 0 620 530" role="img" aria-labelledby="schematic-title schematic-desc">
         <title id="schematic-title">The credential model</title>
         <desc id="schematic-desc">Local secrets unlock two separate identities: a root user reserved for billing and emergencies, and an IAM user for daily work. The IAM user exchanges a console sign-in for short-lived credentials, which are what the AWS CLI and Terraform use.</desc>
 
@@ -393,51 +412,49 @@ html { scroll-behavior: smooth; }
         <g font-family="IBM Plex Sans, system-ui, sans-serif">
 
           <!-- local secrets -->
-          <rect x="150" y="12" width="320" height="76" rx="6" fill="none" stroke="var(--secrets)" stroke-width="1.5"/>
-          <text x="310" y="42" text-anchor="middle" font-size="17" font-weight="600" fill="var(--secrets)">Local secrets</text>
-          <text x="310" y="65" text-anchor="middle" font-size="13" fill="var(--ink-soft)">KeePassXC vault and authenticator app</text>
+          <rect x="125" y="12" width="370" height="76" rx="6" fill="none" stroke="var(--secrets)" stroke-width="1.5"/>
+          <text x="310" y="42" text-anchor="middle" font-size="19" font-weight="600" fill="var(--secrets)">Local secrets</text>
+          <text x="310" y="65" text-anchor="middle" font-size="15" fill="var(--ink-soft)">KeePassXC vault and authenticator app</text>
 
           <!-- edges from secrets -->
           <path d="M240 90 L150 168" fill="none" stroke="var(--rule-strong)" stroke-width="1.5" marker-end="url(#tip)"/>
           <path d="M380 90 L470 168" fill="none" stroke="var(--rule-strong)" stroke-width="1.5" marker-end="url(#tip)"/>
-          <text x="140" y="128" text-anchor="end" font-size="11.5" font-family="IBM Plex Mono, monospace" fill="var(--ink-faint)">password + 2FA</text>
-          <text x="482" y="128" font-size="11.5" font-family="IBM Plex Mono, monospace" fill="var(--ink-faint)">password + 2FA</text>
+          <text x="140" y="128" text-anchor="end" font-size="13" font-family="IBM Plex Mono, monospace" fill="var(--ink-faint)">password + 2FA</text>
+          <text x="482" y="128" font-size="13" font-family="IBM Plex Mono, monospace" fill="var(--ink-faint)">password + 2FA</text>
 
           <!-- root -->
           <rect x="18" y="176" width="256" height="96" rx="6" fill="none" stroke="var(--root)" stroke-width="1.5"/>
-          <text x="146" y="208" text-anchor="middle" font-size="17" font-weight="600" fill="var(--root)">Root user</text>
-          <text x="146" y="230" text-anchor="middle" font-size="13" fill="var(--ink-soft)">MFA, no access keys</text>
-          <text x="146" y="252" text-anchor="middle" font-size="13" fill="var(--ink-soft)">billing and emergencies only</text>
+          <text x="146" y="208" text-anchor="middle" font-size="19" font-weight="600" fill="var(--root)">Root user</text>
+          <text x="146" y="230" text-anchor="middle" font-size="15" fill="var(--ink-soft)">MFA, no access keys</text>
+          <text x="146" y="252" text-anchor="middle" font-size="15" fill="var(--ink-soft)">billing and emergencies only</text>
 
           <!-- iam user -->
           <rect x="346" y="176" width="256" height="96" rx="6" fill="none" stroke="var(--user)" stroke-width="1.5"/>
-          <text x="474" y="214" text-anchor="middle" font-size="17" font-weight="600" fill="var(--user)">IAM user</text>
-          <text x="474" y="238" text-anchor="middle" font-size="13" fill="var(--ink-soft)">MFA, daily work</text>
+          <text x="474" y="214" text-anchor="middle" font-size="19" font-weight="600" fill="var(--user)">IAM user</text>
+          <text x="474" y="238" text-anchor="middle" font-size="15" fill="var(--ink-soft)">MFA, daily work</text>
 
           <!-- root creates user -->
           <path d="M280 224 L340 224" fill="none" stroke="var(--rule-strong)" stroke-width="1.5" marker-end="url(#tip)"/>
-          <text x="310" y="214" text-anchor="middle" font-size="11.5" font-family="IBM Plex Mono, monospace" fill="var(--ink-faint)">created</text>
+          <text x="310" y="214" text-anchor="middle" font-size="13" font-family="IBM Plex Mono, monospace" fill="var(--ink-faint)">created</text>
 
           <!-- user to temp -->
-          <path d="M474 274 L474 320 Q474 336 458 336 L400 336" fill="none" stroke="var(--rule-strong)" stroke-width="1.5" marker-end="url(#tip)"/>
-          <text x="488" y="308" font-size="11.5" font-family="IBM Plex Mono, monospace" fill="var(--ink-faint)">aws login</text>
+          <path d="M474 274 L474 320 Q474 336 458 336 L422 336" fill="none" stroke="var(--rule-strong)" stroke-width="1.5" marker-end="url(#tip)"/>
+          <text x="488" y="308" font-size="13" font-family="IBM Plex Mono, monospace" fill="var(--ink-faint)">aws login</text>
 
           <!-- temp credentials -->
-          <rect x="132" y="300" width="262" height="76" rx="6" fill="none" stroke="var(--temp)" stroke-width="1.5"/>
-          <text x="263" y="330" text-anchor="middle" font-size="17" font-weight="600" fill="var(--temp)">Short-lived credentials</text>
-          <text x="263" y="353" text-anchor="middle" font-size="13" fill="var(--ink-soft)">expire automatically</text>
+          <rect x="118" y="300" width="290" height="76" rx="6" fill="none" stroke="var(--temp)" stroke-width="1.5"/>
+          <text x="263" y="330" text-anchor="middle" font-size="19" font-weight="600" fill="var(--temp)">Short-lived credentials</text>
+          <text x="263" y="353" text-anchor="middle" font-size="15" fill="var(--ink-soft)">expire automatically</text>
 
           <!-- temp to tools -->
           <path d="M200 378 L150 436" fill="none" stroke="var(--rule-strong)" stroke-width="1.5" marker-end="url(#tip)"/>
           <path d="M326 378 L376 436" fill="none" stroke="var(--rule-strong)" stroke-width="1.5" marker-end="url(#tip)"/>
 
           <rect x="50" y="444" width="200" height="60" rx="6" fill="none" stroke="var(--temp)" stroke-width="1.5" stroke-dasharray="3 3"/>
-          <text x="150" y="480" text-anchor="middle" font-size="15" fill="var(--ink)">AWS CLI</text>
+          <text x="150" y="480" text-anchor="middle" font-size="17" fill="var(--ink)">AWS CLI</text>
 
           <rect x="276" y="444" width="200" height="60" rx="6" fill="none" stroke="var(--temp)" stroke-width="1.5" stroke-dasharray="3 3"/>
-          <text x="376" y="480" text-anchor="middle" font-size="15" fill="var(--ink)">Terraform</text>
-
-          <text x="310" y="556" text-anchor="middle" font-size="13" fill="var(--ink-faint)">Nothing permanent reaches the command line.</text>
+          <text x="376" y="480" text-anchor="middle" font-size="17" fill="var(--ink)">Terraform</text>
         </g>
       </svg>
 
@@ -600,7 +617,7 @@ html { scroll-behavior: smooth; }
     <section id="problems">
       <h2>Problems hit and how they were solved</h2>
 
-      <div class="table-wrap">
+      <div class="table-wrap wide" role="region" aria-label="Problems, causes and fixes" tabindex="0">
         <table>
           <thead>
             <tr><th scope="col">Symptom</th><th scope="col">Cause</th><th scope="col">Fix</th></tr>
@@ -765,24 +782,44 @@ cat .gitignore                 <span class="cmt"># state files and secrets exclu
 <script>
 (function () {
   var links = Array.prototype.slice.call(document.querySelectorAll('.index a'));
-  var map = {};
-  links.forEach(function (link) {
-    var target = document.querySelector(link.getAttribute('href'));
-    if (target) { map[target.id] = link; }
-  });
+  if (!links.length) { return; }
 
-  var observer = new IntersectionObserver(function (entries) {
-    entries.forEach(function (entry) {
-      if (entry.isIntersecting) {
-        links.forEach(function (l) { l.removeAttribute('aria-current'); });
-        if (map[entry.target.id]) { map[entry.target.id].setAttribute('aria-current', 'true'); }
-      }
-    });
-  }, { rootMargin: '-10% 0px -75% 0px' });
+  var targets = links.map(function (link) {
+    return { link: link, el: document.querySelector(link.getAttribute('href')) };
+  }).filter(function (t) { return t.el; });
 
-  Object.keys(map).forEach(function (id) {
-    observer.observe(document.getElementById(id));
-  });
+  var current = null;
+
+  function update() {
+    var line = window.scrollY + window.innerHeight * 0.28;
+    var active = targets[0];
+
+    for (var i = 0; i < targets.length; i++) {
+      if (targets[i].el.offsetTop <= line) { active = targets[i]; }
+    }
+
+    // el ultimo apartado gana cuando se llega al final de la pagina
+    if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 4) {
+      active = targets[targets.length - 1];
+    }
+
+    if (active !== current) {
+      if (current) { current.link.removeAttribute('aria-current'); }
+      active.link.setAttribute('aria-current', 'true');
+      current = active;
+    }
+  }
+
+  var ticking = false;
+  function onScroll() {
+    if (ticking) { return; }
+    ticking = true;
+    window.requestAnimationFrame(function () { update(); ticking = false; });
+  }
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll);
+  update();
 })();
 </script>
 
